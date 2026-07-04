@@ -59,6 +59,9 @@ async def my_vac(message: types.Message, db: AsyncClient):
 #         await message.answer("Упс, сталася помилка при збереженні в БД.")
 
 
+async def handle_ping(request):
+    return web.Response(text="Bot is running!")
+
 async def main():
     # Ініціалізація клієнта
     supabase_client: AsyncClient = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
