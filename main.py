@@ -2,6 +2,7 @@ import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiohttp import web
 from supabase import AsyncClient, create_async_client
 
 from settings import SUPABASE_URL, SUPABASE_KEY, TELEGRAM_BOT_TOKEN
@@ -65,7 +66,26 @@ async def main():
     # Реєстрація мідлваря
     dp.update.middleware(SupabaseMiddleware(supabase_client))
 
-    print("Бот запускається в режимі Polling на Hugging Face...")
+    # --- ХАК ДЛЯ БЕЗКОШТОВНОГО RENDER ---
+    app = web.Application()
+    app.router.add_get("/", handle_ping)
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    # Render сам передає порт у змінну оточення PORT (за замовчуванням 10000)
+    port = int(os.getenv("PORT", 10000))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(  # render_port_log
+        f"Веб-сервер заглушки запущено на порту {port}"
+    )
+    # -------------------------------------
+
+
+
+
+
+    print("Бот запускається в режимі Polling на Render (Free)...")
     try:
         await dp.start_polling(bot)
     finally:
