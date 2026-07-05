@@ -1,21 +1,36 @@
 import os
 import asyncio
+from pprint import pprint
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
+from aiogram.types import Message
 from supabase import AsyncClient, create_async_client
 
-from settings import SUPABASE_URL, SUPABASE_KEY, TELEGRAM_BOT_TOKEN
+from settings import SUPABASE_URL, SUPABASE_KEY, TELEGRAM_BOT_TOKEN, IN_DOCKER
 from src.middlewares.supabase import SupabaseMiddleware
-
+from src.handlers import start_router, not_registered_user_router, filters_router
+from src.middlewares.user import UserInjectedMiddleware
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 
+@dp.message(Command("me"))
+async def cmd_me(message: Message):
+    pprint(message.model_dump(exclude_none=True))
+    await message.reply(
+        text=f"user_name: {message.from_user.username} \n"
+             f"first_name: {message.from_user.first_name} \nlast_name: {message.chat.last_name} \n"
+             f"id: {message.from_user.id} \n"
+             f"language_code: {message.from_user.language_code}"
+             f"is_bot: {message.from_user.is_bot}"
+
+    )
+
 @dp.message(Command("my"))
-async def my_vac(message: types.Message, db: AsyncClient):
+async def my_vac(message: Message, db: AsyncClient):
     user_id = message.from_user.id
     try:
         # 1. Робимо запит до БД
@@ -61,6 +76,7 @@ async def my_vac(message: types.Message, db: AsyncClient):
 
 
 async def handle_ping(request):
+    """Пінгує для безкоштовної роботи на render.com"""
     return web.Response(text="Bot is running!")
 
 async def main():
@@ -69,32 +85,28 @@ async def main():
 
     # Реєстрація мідлваря
     dp.update.middleware(SupabaseMiddleware(supabase_client))
+    dp.update.middleware(UserInjectedMiddleware(supabase_client))
 
-    # --- ХАК ДЛЯ БЕЗКОШТОВНОГО RENDER ---
-    app = web.Application()
-    app.router.add_get("/", handle_ping)
-    runner = web.AppRunner(app)
-    await runner.setup()
+    dp.include_routers(start_router, not_registered_user_router, filters_router)
 
-    # Render сам передає порт у змінну оточення PORT (за замовчуванням 10000)
-    port = int(os.getenv("PORT", 10000))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    print(  # render_port_log
-        f"Веб-сервер заглушки запущено на порту {port}"
-    )
-    # -------------------------------------
-
-
-
-
-
-    print("Бот запускається в режимі Polling на Render (Free)...")
+    if IN_DOCKER:
+        # --- ХАК ДЛЯ БЕЗКОШТОВНОГО RENDER ---
+        app = web.Application()
+        app.router.add_get("/", handle_ping)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        # Render сам передає порт у змінну оточення PORT (за замовчуванням 10000)
+        port = int(os.getenv("PORT", 10000))
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        await site.start()
+        print(  # render_port_log
+            f"Веб-сервер заглушки запущено на порту {port}"
+        )
+        # -------------------------------------
+        print("Бот запускається в контейнері в режимі Polling на Render (Free)...")
     try:
         await dp.start_polling(bot)
     finally:
-        # У самого supabase_client немає close(),
-        # але ми можемо закрити внутрішній асинхронний HTTP-клієнт httpx
         if hasattr(supabase_client, "http_client") and supabase_client.http_client:
             await supabase_client.http_client.aclose()
 

@@ -1,0 +1,2 @@
+class EmptyResponse(Exception):
+    pass
