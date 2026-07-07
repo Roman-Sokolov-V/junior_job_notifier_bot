@@ -10,7 +10,7 @@ from supabase import AsyncClient, create_async_client
 
 from settings import SUPABASE_URL, SUPABASE_KEY, TELEGRAM_BOT_TOKEN, IN_DOCKER
 from src.middlewares.supabase import SupabaseMiddleware
-from src.handlers import start_router, not_registered_user_router, filters_router
+from src.handlers import start_router, not_registered_user_router, filters_router, vacancies_router
 from src.middlewares.user import UserInjectedMiddleware
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -87,7 +87,7 @@ async def main():
     dp.update.middleware(SupabaseMiddleware(supabase_client))
     dp.update.middleware(UserInjectedMiddleware(supabase_client))
 
-    dp.include_routers(start_router, not_registered_user_router, filters_router)
+    dp.include_routers(start_router, not_registered_user_router, filters_router, vacancies_router)
 
     if IN_DOCKER:
         # --- ХАК ДЛЯ БЕЗКОШТОВНОГО RENDER ---

@@ -3,14 +3,23 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, User
 
 from src.exeptions import EmptyResponse
-from src.handlers.crud import get_user_from_db
-
+from src.handlers.crud import get_user_from_db, get_user_profiles_from_db
 
 
 class UserInjectedMiddleware(BaseMiddleware):
+    """
+    створює кеш з даними користувачів з бд, передає в контекст
+
+    """
     def __init__(self, db: AsyncClient):
         self.db = db
-        self.cache = {}  # Зберігає {tg_id: user_data_dict} або {tg_id: None}
+        self.cache = {}
+        # Зберігає self.cache = {
+        #                         "tg_id": {
+        #                             "id": int,
+        #                             "username": str,
+        #                           }
+        #                       }
 
     async def __call__(self, handler, event: TelegramObject, data: dict):
         tg_user: User = data.get("event_from_user")
@@ -21,7 +30,7 @@ class UserInjectedMiddleware(BaseMiddleware):
             else:
                 # 2. Якщо в кеші немає — ОДИН раз йдемо в базу
                 try:
-                    user_data: dict = await get_user_from_db(user_id=tg_user.id, db=self.db)
+                    user_data: dict = await get_user_from_db(telegram_user_id=tg_user.id, db=self.db)
                     self.cache[tg_user.id] = user_data
                     data["user_data"] = user_data
                 except EmptyResponse:

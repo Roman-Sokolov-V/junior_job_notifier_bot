@@ -9,7 +9,7 @@ from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, InlineKe
 from supabase import AsyncClient, create_async_client
 
 from src.handlers.crud import register_user_db
-from src.keyboards.keyboards import registered_kb
+from src.keyboards.keyboards import registered_kb, create_profile_kb
 
 router = Router()
 
@@ -26,5 +26,5 @@ async def register_user(callback: CallbackQuery, db: AsyncClient, users_cache: d
     except Exception as e:
         print(f"Помилка бази даних: {e}")
         await callback.answer("Упс, сталася помилка при реєстрації користувача в дб.")
-    await callback.message.edit_text("Успішно зареєстровано", reply_markup=registered_kb)
+    await callback.message.edit_text("Успішно зареєстровано", reply_markup=create_profile_kb)
 
