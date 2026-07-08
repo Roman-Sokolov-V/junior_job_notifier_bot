@@ -1,29 +1,33 @@
+import logging
+
 from supabase import AsyncClient
 
 from src.exeptions import EmptyResponse
 
+logger = logging.getLogger(__name__)
+
 async def get_user_from_db(telegram_user_id: int, db: AsyncClient) -> dict:
-    print("Шукаю користувача в бд")
+    logger.info("Шукаю користувача в бд")
     response = await (
         db.table('users')
         .select("id", "username")
         .eq("telegram_user_id", telegram_user_id)
         .execute()
     )
-    print(response.data)
+    logger.debug(response.data)
     if not response.data:
         raise EmptyResponse
     return response.data[0]
 
 async def get_user_profiles_from_db(user_db_id: int, db: AsyncClient) -> list[dict]:
-    print("Шукаю profile в бд")
+    logger.info("Шукаю profile в бд")
     response = await (
         db.table('user_profiles')
         .select("*")
         .eq("user_id", user_db_id)
         .execute()
     )
-    print(response.data)
+    logger.debug(response.data)
     if not response.data:
         raise EmptyResponse
     return response.data

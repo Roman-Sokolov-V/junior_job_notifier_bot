@@ -1,71 +1,118 @@
+"""The main module for launching a Telegram bot.
+
+This module is responsible for initializing the bot, manager, asynchronous client
+Supabase, registration of middlewares, routers, and running the Long Polling process.
+"""
 import asyncio
-from pprint import pprint
+import logging
+
 from aiogram import Bot, Dispatcher
-from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
-#from aiohttp import web
-from aiogram.types import Message
 from supabase import AsyncClient, create_async_client
 
 from render_ping import hack_render
-from settings import SUPABASE_URL, SUPABASE_KEY, TELEGRAM_BOT_TOKEN, IN_DOCKER
+from settings import IN_DOCKER, SUPABASE_KEY, SUPABASE_URL, TELEGRAM_BOT_TOKEN, setup_logging
+from src.handlers import router
 from src.middlewares.supabase import SupabaseMiddleware
-from src.handlers import start_router, not_registered_user_router, filters_router, vacancies_router
 from src.middlewares.user import UserInjectedMiddleware
 
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+# Ініціалізація бота та диспетчера
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
+async def on_startup(dispatcher: Dispatcher) -> None:
+    """Actions performed when the bot starts.
 
-@dp.message(Command("me"))
-async def cmd_me(message: Message):
-    pprint(message.model_dump(exclude_none=True))
-    await message.reply(
-        text=f"user_name: {message.from_user.username} \n"
-             f"first_name: {message.from_user.first_name} \nlast_name: {message.chat.last_name} \n"
-             f"id: {message.from_user.id} \n"
-             f"language_code: {message.from_user.language_code}"
-             f"is_bot: {message.from_user.is_bot}"
+    Initializes the asynchronous Supabase client, registers middleware
+    and integrates the client into the global context of the dispatcher.
+    """
+    logger.info("Запуск бота та ініціалізація ресурсів...")
 
+    # Ініціалізація клієнта Supabase
+    supabase_client: AsyncClient = await create_async_client(
+        SUPABASE_URL, SUPABASE_KEY
     )
 
+    # Зберігаємо клієнт у workflow_data диспетчера, щоб він був доступний усюди
+    dispatcher["supabase_client"] = supabase_client
 
-# async def handle_ping(request):
-#     """Пінгує для безкоштовної роботи на render.com"""
-#     return web.Response(text="Bot is running!")
+    # Реєстрація мідлварів (передаємо клієнт із контексту)
+    dispatcher.update.middleware(SupabaseMiddleware(supabase_client))
+    dispatcher.update.middleware(UserInjectedMiddleware(supabase_client))
 
-async def main():
-    # Ініціалізація клієнта
-    supabase_client: AsyncClient = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
+    # Включення головного роутера з хендлерами
+    dispatcher.include_routers(router)
 
-    # Реєстрація мідлваря
-    dp.update.middleware(SupabaseMiddleware(supabase_client))
-    dp.update.middleware(UserInjectedMiddleware(supabase_client))
-
-    dp.include_routers(start_router, not_registered_user_router, filters_router, vacancies_router)
-
+    # Тригер для утримання Render-сервісу в активному стані (якщо в Docker)
     if IN_DOCKER:
+        logger.info("Виявлено середовище Docker. Запуск hack_render()...")
         await hack_render()
 
-        # # --- ХАК ДЛЯ БЕЗКОШТОВНОГО RENDER ---
-        # app = web.Application()
-        # app.router.add_get("/", handle_ping)
-        # runner = web.AppRunner(app)
-        # await runner.setup()
-        # # Render сам передає порт у змінну оточення PORT (за замовчуванням 10000)
-        # port = int(os.getenv("PORT", 10000))
-        # site = web.TCPSite(runner, "0.0.0.0", port)
-        # await site.start()
-        # print(  # render_port_log
-        #     f"Веб-сервер заглушки запущено на порту {port}"
-        # )
-        # # -------------------------------------
-        # print("Бот запускається в контейнері в режимі Polling на Render (Free)...")
-    try:
-        await dp.start_polling(bot)
-    finally:
-        if hasattr(supabase_client, "http_client") and supabase_client.http_client:
+
+async def on_shutdown(dispatcher: Dispatcher) -> None:
+    """Дії, що виконуються під час зупинки бота.
+
+    Безпечно закриває всі відкриті з'єднання та сесії клієнта Supabase.
+    """
+    logger.info("Зупинка бота. Очищення ресурсів...")
+    supabase_client: AsyncClient = dispatcher.get("supabase_client")
+
+    if supabase_client:
+        # Безпечне закриття HTTP-клієнта Supabase
+        if (
+            hasattr(supabase_client, "http_client")
+            and supabase_client.http_client
+        ):
             await supabase_client.http_client.aclose()
+            logger.info("Сесію Supabase клієнта успішно закрито.")
+
+
+async def main() -> None:
+    """Головна функція для конфігурації та запуску Long Polling."""
+    # Реєстрація колбеків життєвого циклу
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
+    try:
+        # Запуск отримання оновлень від Telegram (пропускаємо старі апдейти для чистих логів)
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    except Exception as e:
+        logger.critical(f"Критична помилка під час роботи бота: {e}", exc_info=True)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Бот зупинений користувачем.")
+
+
+
+#
+#
+#
+# async def main():
+#     # Ініціалізація клієнта
+#     supabase_client: AsyncClient = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
+#
+#     # Реєстрація мідлваря
+#     dp.update.middleware(SupabaseMiddleware(supabase_client))
+#     dp.update.middleware(UserInjectedMiddleware(supabase_client))
+#
+#     dp.include_routers(router)
+#
+#     if IN_DOCKER:
+#         await hack_render()
+#
+#     try:
+#         await dp.start_polling(bot)
+#     finally:
+#         if hasattr(supabase_client, "http_client") and supabase_client.http_client:
+#             await supabase_client.http_client.aclose()
 
 
 if __name__ == "__main__":

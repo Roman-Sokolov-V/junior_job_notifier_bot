@@ -1,10 +1,16 @@
 import os
+import logging
+
 from aiohttp import web
-from settings import render_ping_logger as logger
 
-# --- ХАК ДЛЯ БЕЗКОШТОВНОГО RENDER З ЛОГУВАННЯМ ---
 
+logger = logging.getLogger(__name__)
+
+# --- ХАК ДЛЯ БЕЗКОШТОВНОГО RENDER ---
+# для роботи також потрібне періодичне пінгування сервісу
+# у мене реалізовано на cron-job.org
 async def handle_ping(request):
+    """Пінгує для безкоштовної роботи на render.com"""
     # Цей запис буде з'являтися кожні 10 хвилин, коли cron-job.org смикає бот
     logger.info("🤖 Отримано пінг від cron-job.org! Тримаємо додаток живим.")
     return web.Response(text="OK", status=200)

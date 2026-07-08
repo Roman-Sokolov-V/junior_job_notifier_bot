@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -6,13 +8,24 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from supabase import AsyncClient
 
 from src.exeptions import EmptyResponse
-from src.db.crud import create_or_update_profile_db, get_user_profiles_from_db, delete_profile_from_db, \
+from src.db.crud import (
+    create_or_update_profile_db,
+    get_user_profiles_from_db,
+    delete_profile_from_db,
     delete_user_from_db
-from src.keyboards.keyboards import registered_kb, save_or_remake_profile_kb, create_profile_kb, to_main_button, \
+)
+from src.keyboards.keyboards import (
+    registered_kb,
+    save_or_remake_profile_kb,
+    create_profile_kb,
+    to_main_button,
     delete_subscription_button
+)
+
+
+logger = logging.getLogger(__name__)
 
 router = Router()
-
 
 
 class Profile(StatesGroup):
@@ -25,7 +38,7 @@ class Profile(StatesGroup):
 @router.callback_query(F.data == "create_profile")
 async def create_profile(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    print("start in create_profile")
+    logger.debug("start in create_profile")
     await state.set_state(Profile.name)
     await callback.message.answer(
         "📝 **Введіть ім'я для нового профілю пошуку**\n\n"
@@ -34,7 +47,7 @@ async def create_profile(callback: CallbackQuery, state: FSMContext):
     )
 @router.message(Profile.name)
 async def add_name_ask_for_include_filters(message: Message, state: FSMContext):
-    print("start add_name_ask_for_include_filters")
+    logger.debug("start add_name_ask_for_include_filters")
     await state.update_data(name=message.text)
     await state.set_state(Profile.include_keywords)
     await message.answer(
@@ -47,7 +60,7 @@ async def add_name_ask_for_include_filters(message: Message, state: FSMContext):
 
 @router.message(Profile.include_keywords)
 async def add_include_ask_for_exclude_filters(message: Message, state: FSMContext):
-    print("start add_include_ask_for_exclude_filters")
+    logger.debug("start add_include_ask_for_exclude_filters")
     text = message.text
     key_words = text.lower().strip().split()
     await state.update_data(include_keywords=key_words if key_words != ["pass"] else [])
@@ -63,7 +76,7 @@ async def add_include_ask_for_exclude_filters(message: Message, state: FSMContex
 
 @router.message(Profile.exclude_keywords)
 async def add_exclude_ask_for_prompt(message: Message, state: FSMContext):
-    print("start add_exclude_ask_for_prompt")
+    logger.debug("start add_exclude_ask_for_prompt")
     text = message.text
     key_words = text.lower().strip().split()
     await state.update_data(exclude_keywords=key_words if key_words != ["pass"] else [])
@@ -78,11 +91,10 @@ async def add_exclude_ask_for_prompt(message: Message, state: FSMContext):
 
 @router.message(Profile.query_text)
 async def add_prompt_create_profile_in_db(message: Message, state: FSMContext, user_data: dict):
-    print("start in add_prompt_create_profile_in_db")
+    logger.debug("start in add_prompt_create_profile_in_db")
     text = message.text.strip()
     await state.update_data(query_text=text if text.lower() != "pass" else "")
     profile_data = await state.get_data()
-    #await state.clear()
 
     profile_name = profile_data.pop("name")
     if not any(profile_data.values()):
