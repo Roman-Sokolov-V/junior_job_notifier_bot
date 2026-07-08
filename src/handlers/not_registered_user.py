@@ -1,15 +1,10 @@
-from urllib import response
-
 from aiogram import Router, F
-from aiogram.filters import Command, callback_data
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, InlineKeyboardMarkup
+from aiogram.types import CallbackQuery
 
-from supabase import AsyncClient, create_async_client
+from supabase import AsyncClient
 
-from src.handlers.crud import register_user_db
-from src.keyboards.keyboards import registered_kb, create_profile_kb
+from src.db.crud import register_user_db
+from src.keyboards.keyboards import create_profile_kb
 
 router = Router()
 

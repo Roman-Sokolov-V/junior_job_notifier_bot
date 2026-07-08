@@ -3,7 +3,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, User
 
 from src.exeptions import EmptyResponse
-from src.handlers.crud import get_user_from_db, get_user_profiles_from_db
+from src.db.crud import get_user_from_db
 
 
 class UserInjectedMiddleware(BaseMiddleware):

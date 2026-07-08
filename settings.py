@@ -19,3 +19,4 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 render_ping_logger = logging.getLogger("RenderPing")
+bot_logger = logging.getLogger("Bot")

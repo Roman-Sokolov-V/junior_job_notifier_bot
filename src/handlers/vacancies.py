@@ -1,9 +1,9 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import CallbackQuery
 
 from supabase import AsyncClient
 
-from src.handlers.crud import get_user_vacancies_from_db
+from src.db.crud import get_user_vacancies_from_db
 from src.keyboards.keyboards import registered_kb
 
 router = Router()

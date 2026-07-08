@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from supabase import AsyncClient
 
 from src.exeptions import EmptyResponse
-from src.handlers.crud import create_or_update_profile_db, get_user_profiles_from_db, delete_profile_from_db, \
+from src.db.crud import create_or_update_profile_db, get_user_profiles_from_db, delete_profile_from_db, \
     delete_user_from_db
 from src.keyboards.keyboards import registered_kb, save_or_remake_profile_kb, create_profile_kb, to_main_button, \
     delete_subscription_button
