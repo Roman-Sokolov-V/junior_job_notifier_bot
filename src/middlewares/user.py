@@ -1,27 +1,59 @@
+"""Middleware for high-performance in-memory user data caching.
+
+This module utilizes cachetools to provide an in-memory TTL (Time-To-Live) cache,
+minimizing database calls to Supabase while ensuring data freshness.
+"""
+
+from typing import Any, Awaitable, Callable, Dict, Optional, TypedDict
+
 from supabase import AsyncClient
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, User
+from cachetools import TTLCache
 
 from src.exeptions import EmptyResponse
 from src.db.crud import get_user_from_db
 
 
-class UserInjectedMiddleware(BaseMiddleware):
-    """
-    створює кеш з даними користувачів з бд, передає в контекст
+class UserCacheItem(TypedDict):
+    """Schema for a single user record stored in the cache."""
+    id: int        # Внутрішній ID користувача в базі даних Supabase
+    username: str  # Юзернейм користувача з Telegram / БД
 
+
+class UserInjectedMiddleware(BaseMiddleware):
+    """Middleware to cache user data directly in the application's RAM.
+
+    Uses a TTL (Time-To-Live) strategy to automatically invalidate cached profiles.
+
+    Cache Structure:
+        {
+            telegram_id (int): {
+                "id": int,
+                "username": str
+            } | None
+        }
     """
     def __init__(self, db: AsyncClient):
-        self.db = db
-        self.cache = {}
-        # Зберігає self.cache = {
-        #                         "tg_id": {
-        #                             "id": int,
-        #                             "username": str,
-        #                           }
-        #                       }
+        """Initialize the middleware with a bounded TTL cache.
 
-    async def __call__(self, handler, event: TelegramObject, data: dict):
+        Args:
+            db (AsyncClient): The initialized Supabase async client.
+        """
+        super().__init__()
+        self.db = db
+        self.cache: TTLCache[int, Optional[UserCacheItem]] = TTLCache(
+            maxsize=1000, ttl=300
+        )
+
+
+    async def __call__(
+            self,
+            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+            event: TelegramObject,
+            data: dict
+    ) -> Any:
+        """Process the update, injecting cached or freshly fetched user data."""
         tg_user: User = data.get("event_from_user")
         if tg_user:
             # 1. Перевіряємо, чи є tg_id в кеші
