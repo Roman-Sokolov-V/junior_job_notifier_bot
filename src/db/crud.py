@@ -2,7 +2,7 @@ import logging
 
 from supabase import AsyncClient
 
-from src.exeptions import EmptyResponse
+from src.exceptions import EmptyResponse
 
 logger = logging.getLogger(__name__)
 

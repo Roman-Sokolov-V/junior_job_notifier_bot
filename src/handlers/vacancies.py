@@ -1,3 +1,12 @@
+"""Handlers for managing and displaying saved user vacancies.
+
+This module fetches bookmarked job listings from Supabase and renders them
+to the user, ensuring compliance with Telegram message length constraints.
+"""
+
+import logging
+from typing import Any
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
@@ -6,20 +15,57 @@ from supabase import AsyncClient
 from src.db.crud import get_user_vacancies_from_db
 from src.keyboards.keyboards import registered_kb
 
+logger = logging.getLogger(__name__)
+
 router = Router()
 
 @router.callback_query(F.data == "vacancy")
 async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data:dict):
+    """Fetch and display all vacancies bookmarked by the user.
+
+    Aggregates job URLs and sends them back to the user, splitting the payload
+    into chunks if the total text length exceeds Telegram's 4096-character limit.
+    """
     try:
-        vacancies = await get_user_vacancies_from_db(user_db_id=user_data['id'], db=db)
+        vacancies: list[dict[str, Any]] = await get_user_vacancies_from_db(
+            user_db_id=user_data["id"], db=db
+        )
         if not vacancies:
-            text = "У вас поки немає збережених вакансій."
-        else:
-            urls = [row["url"] for row in vacancies]
-            text = "\n".join(urls)
-        await callback.message.answer(text=text, reply_markup=registered_kb)
+            await callback.message.answer(
+                text="📋 **У вас поки немає збережених вакансій.**\n\n"
+                     "💡 **Як це працює:** Бот збирає нові вакансії та аналізує їх під ваші фільтри **один раз на добу**.\n\n"
+                     "⏳ Якщо ви щойно налаштували пошук, будь ласка, зачекайте — перша підбірка з'явиться протягом 24 годин.",
+                reply_markup=registered_kb,
+                parse_mode="Markdown"
+            )
+            await callback.answer()
+            return
+
+        urls = [row["url"] for row in vacancies]
+        #  Захист від ліміту Telegram (4096 символів)
+        # Збираємо посилання порціями, щоб повідомлення не падало
+        current_chunk: list[str] = []
+        current_length = 0
+        for url in urls:
+            # +1 враховує символ перенесення рядка "\n"
+            if current_length + len(url) + 1 > 4000:
+                await callback.message.answer(text="\n".join(current_chunk))
+                current_chunk = []
+                current_length = 0
+
+            current_chunk.append(url)
+            current_length += len(url) + 1
+            # Надсилаємо залишок вакансій разом із головним меню
+        if current_chunk:
+            await callback.message.answer(
+                text="\n".join(current_chunk),
+                reply_markup=registered_kb
+            )
 
     except Exception as e:
-        print(f"Помилка бази даних: {e}")
-        # Тут краще змінити текст помилки, бо ми вже не зберігаємо, а отримуємо дані
-        await callback.message.answer("Упс, сталася помилка при отриманні вакансій з БД.")
+        logger.error(
+            "Помилка бази даних при отриманні вакансій для користувача %s: %s",
+            user_data.get("id"), e, exc_info=True
+        )
+        await callback.message.answer("Упс, сталася помилка при отриманні вакансій з бази даних.")
+        await callback.answer()

@@ -11,7 +11,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, User
 from cachetools import TTLCache
 
-from src.exeptions import EmptyResponse
+from src.exceptions import EmptyResponse
 from src.db.crud import get_user_from_db
 
 
