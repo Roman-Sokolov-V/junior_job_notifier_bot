@@ -67,5 +67,7 @@ WEB_SERVER_HOST = "0.0.0.0"
 WEB_SERVER_PORT = 8080
 
 WEBHOOK_PATH = "/webhook"
-# Render підставляє публічний URL сервісу через змінну оточення RENDER_EXTERNAL_URL
+# Render автоматично прописує публічну адресу сервісу
+# у змінну оточення RENDER_EXTERNAL_URL, наприклад:
+# https://junior-job-notifier-bot.onrender.com
 WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL", "") + WEBHOOK_PATH
