@@ -56,3 +56,16 @@ LOGGING_CONFIG = {
 def setup_logging():
     """Ініціалізація конфігурації логування для Docker/Render."""
     logging.config.dictConfig(LOGGING_CONFIG)
+
+
+
+import secrets
+
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", secrets.token_urlsafe(32))
+BASE_WEBHOOK_URL = ""
+WEB_SERVER_HOST = "0.0.0.0"
+WEB_SERVER_PORT = 8080
+
+WEBHOOK_PATH = "/webhook"
+# Render підставляє публічний URL сервісу через змінну оточення RENDER_EXTERNAL_URL
+WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL", "") + WEBHOOK_PATH
