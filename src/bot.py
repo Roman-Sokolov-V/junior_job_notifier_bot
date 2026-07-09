@@ -47,10 +47,12 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
 
 
 async def on_shutdown(bot: Bot) -> None:
-    """Called when the server is stopped (for example, by SIGTERM)."""
-
     logger.info("Зупинка бота. Очищення ресурсів...")
-    await bot.delete_webhook()
+    #await bot.delete_webhook()
+
     if supabase_client and hasattr(supabase_client, "http_client"):
         await supabase_client.http_client.aclose()
         logger.info("Сесію Supabase клієнта успішно закрито.")
+
+    await bot.session.close()
+    logger.info("Сесію бота успішно закрито.")
