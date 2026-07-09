@@ -61,7 +61,7 @@ def setup_logging():
 
 import secrets
 
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", secrets.token_urlsafe(32))
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 BASE_WEBHOOK_URL = ""
 WEB_SERVER_HOST = "0.0.0.0"
 WEB_SERVER_PORT = 8080
