@@ -115,5 +115,5 @@ if __name__ == "__main__":
 #             await supabase_client.http_client.aclose()
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
