@@ -82,7 +82,7 @@ to_main_button = InlineKeyboardButton(
 """Navigation leaf link allowing structural jumps straight back to the landing menu."""
 
 delete_subscription_button = InlineKeyboardButton(
-    text="❌ Видалити підписку",
+    text="❌ Так я впевнений. Видалити підписку",
     callback_data="delete_subscription"
 )
 """Destructive finality operation button that requests backend record purging."""
