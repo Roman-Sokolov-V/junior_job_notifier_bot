@@ -75,7 +75,7 @@ async def create_or_update_profile_db(profile_data: dict, db: AsyncClient) -> di
 async def get_user_vacancies_from_db(user_db_id: int, db: AsyncClient) -> list[dict]:
     response = await (
         db.table("vacancies")
-        .select("url, user_matches!inner(user_id)")
+        .select("title, url, user_matches!inner(user_id)")
         .eq("user_matches.user_id", user_db_id)
         .execute()
     )

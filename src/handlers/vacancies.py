@@ -41,26 +41,27 @@ async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data:dict):
             await callback.answer()
             return
 
-        urls = [row["url"] for row in vacancies]
         #  Захист від ліміту Telegram (4096 символів)
         # Збираємо посилання порціями, щоб повідомлення не падало
+        chunks: list[str] = []
         current_chunk: list[str] = []
         current_length = 0
-        for url in urls:
-            # +1 враховує символ перенесення рядка "\n"
-            if current_length + len(url) + 1 > 4000:
-                await callback.message.answer(text="\n".join(current_chunk))
-                current_chunk = []
-                current_length = 0
-
-            current_chunk.append(url)
-            current_length += len(url) + 1
-            # Надсилаємо залишок вакансій разом із головним меню
-        if current_chunk:
-            await callback.message.answer(
-                text="\n".join(current_chunk),
-                reply_markup=registered_kb
-            )
+        for vac in vacancies:
+            vac_text = f"vac['title']/n{vac['title']}"
+            vac_length = len(vac_text)
+            if current_length + vac_length  > 4090:
+                #await callback.message.answer(text="\n\n".join(current_chunk))
+                chunks.append("\n\n".join(current_chunk))
+                current_chunk = [vac_text]
+                current_length = 1
+            else:
+                current_chunk.append(vac_text)
+                current_length += len(vacancies) + 4
+        # останній посилаємо з клавіатурою
+        await callback.message.answer(
+            text="\n\n".join(current_chunk),
+            reply_markup=registered_kb
+        )
 
     except Exception as e:
         logger.error(
