@@ -68,7 +68,7 @@ junior_job_notifier_bot/
 │   │   ├── start.py             # /start, registration entry point
 │   │   ├── not_registered_user.py
 │   │   ├── profile.py           # profile creation/editing FSM, deletion
-│   │   ├── me.py                # "My profiles" view
+│   │   ├── me.py                # "About telegram user" view
 │   │   └── vacancies.py         # browsing matched vacancies
 │   ├── keyboards/
 │   │   └── keyboards.py         # reply & inline keyboards
@@ -78,9 +78,11 @@ junior_job_notifier_bot/
 │   ├── bot.py                   # Bot/Dispatcher factory, startup/shutdown hooks
 │   └── exceptions.py
 ├── main.py                      # aiohttp webhook server entry point (production)
+├── main_polling.py              # aiohttp polling server entry point
 ├── polling_main.py              # long polling entry point (local development only)
 ├── settings.py                  # environment configuration, logging setup
 ├── Dockerfile
+├── polling.Dockerfile
 ├── pyproject.toml
 └── uv.lock
 ```
