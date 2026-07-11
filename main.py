@@ -11,18 +11,15 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-
 def main() -> None:
     dp = create_dispatcher()
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
     bot = create_bot()
     app = web.Application()
-    SimpleRequestHandler(
-        dispatcher=dp,
-        bot=bot,
-        secret_token=WEBHOOK_SECRET
-    ).register(app, path=WEBHOOK_PATH)
+    SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(
+        app, path=WEBHOOK_PATH
+    )
     setup_application(app, dp, bot=bot)
     port = int(os.getenv("PORT", 10000))
     web.run_app(app, host="0.0.0.0", port=port)
@@ -31,5 +28,5 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except (KeyboardInterrupt, SystemExit):
+    except KeyboardInterrupt, SystemExit:
         logger.info("Бот зупинений користувачем.")

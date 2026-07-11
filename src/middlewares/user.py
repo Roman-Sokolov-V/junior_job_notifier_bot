@@ -17,7 +17,8 @@ from src.db.crud import get_user_from_db
 
 class UserCacheItem(TypedDict):
     """Schema for a single user record stored in the cache."""
-    id: int        # Внутрішній ID користувача в базі даних Supabase
+
+    id: int  # Внутрішній ID користувача в базі даних Supabase
     username: str  # Юзернейм користувача з Telegram / БД
 
 
@@ -34,6 +35,7 @@ class UserInjectedMiddleware(BaseMiddleware):
             } | None
         }
     """
+
     def __init__(self, db: AsyncClient):
         """Initialize the middleware with a bounded TTL cache.
 
@@ -46,12 +48,11 @@ class UserInjectedMiddleware(BaseMiddleware):
             maxsize=1000, ttl=300
         )
 
-
     async def __call__(
-            self,
-            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-            event: TelegramObject,
-            data: dict
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict,
     ) -> Any:
         """Process the update, injecting cached or freshly fetched user data."""
         tg_user: User = data.get("event_from_user")
@@ -62,7 +63,9 @@ class UserInjectedMiddleware(BaseMiddleware):
             else:
                 # 2. Якщо в кеші немає — ОДИН раз йдемо в базу
                 try:
-                    user_data: dict = await get_user_from_db(telegram_user_id=tg_user.id, db=self.db)
+                    user_data: dict = await get_user_from_db(
+                        telegram_user_id=tg_user.id, db=self.db
+                    )
                     self.cache[tg_user.id] = user_data
                     data["user_data"] = user_data
                 except EmptyResponse:

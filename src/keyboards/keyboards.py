@@ -13,7 +13,9 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 not_registered_kb = InlineKeyboardMarkup(
     inline_keyboard=[
         [
-            InlineKeyboardButton(text="🚀 Зареєструватися у боті", callback_data="register_user")
+            InlineKeyboardButton(
+                text="🚀 Зареєструватися у боті", callback_data="register_user"
+            )
         ]
     ]
 )
@@ -23,16 +25,20 @@ not_registered_kb = InlineKeyboardMarkup(
 registered_kb = InlineKeyboardMarkup(
     inline_keyboard=[
         [
-            InlineKeyboardButton(text="🔍 Показати знайдені вакансії", callback_data="vacancy")
+            InlineKeyboardButton(
+                text="🔍 Показати знайдені вакансії", callback_data="vacancy"
+            )
         ],
         [
-            InlineKeyboardButton(text="🔧 Додати / змінити профіль", callback_data="create_profile")
+            InlineKeyboardButton(
+                text="🔧 Додати / змінити профіль", callback_data="create_profile"
+            )
         ],
+        [InlineKeyboardButton(text="📋 Мої профілі", callback_data="show_profiles")],
         [
-            InlineKeyboardButton(text="📋 Мої профілі", callback_data="show_profiles")
-        ],
-        [
-            InlineKeyboardButton(text="❌ Видалити підписку", callback_data="unsubscribe")
+            InlineKeyboardButton(
+                text="❌ Видалити підписку", callback_data="unsubscribe"
+            )
         ],
     ]
 )
@@ -48,13 +54,12 @@ save_or_remake_profile_kb = InlineKeyboardMarkup(
         [
             InlineKeyboardButton(
                 text="🔧 Текст немножко по-дибильному написаний (переробити)",
-                callback_data="create_profile"
+                callback_data="create_profile",
             )
         ],
         [
             InlineKeyboardButton(
-                text="💾 Все чотко, зберегти профіль!",
-                callback_data="save_profile"
+                text="💾 Все чотко, зберегти профіль!", callback_data="save_profile"
             )
         ],
     ]
@@ -64,7 +69,9 @@ save_or_remake_profile_kb = InlineKeyboardMarkup(
 create_profile_kb = InlineKeyboardMarkup(
     inline_keyboard=[
         [
-            InlineKeyboardButton(text="➕ Створити профайл пошуку", callback_data="create_profile")
+            InlineKeyboardButton(
+                text="➕ Створити профайл пошуку", callback_data="create_profile"
+            )
         ]
     ]
 )
@@ -76,13 +83,11 @@ create_profile_kb = InlineKeyboardMarkup(
 # =====================================================================
 
 to_main_button = InlineKeyboardButton(
-    text="📱 До головного меню",
-    callback_data="to_main"
+    text="📱 До головного меню", callback_data="to_main"
 )
 """Navigation leaf link allowing structural jumps straight back to the landing menu."""
 
 delete_subscription_button = InlineKeyboardButton(
-    text="❌ Так я впевнений. Видалити підписку",
-    callback_data="delete_subscription"
+    text="❌ Так я впевнений. Видалити підписку", callback_data="delete_subscription"
 )
 """Destructive finality operation button that requests backend record purging."""

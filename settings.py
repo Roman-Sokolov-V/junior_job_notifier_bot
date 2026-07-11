@@ -11,11 +11,11 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Supabase credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SICRET_KEY") #SUPABASE_PUPLISH_KEY
+SUPABASE_KEY = os.getenv("SUPABASE_SICRET_KEY")  # SUPABASE_PUPLISH_KEY
 
 IN_DOCKER = os.getenv("IN_DOCKER", False)
 
-#LOG_LEVEL = "INFO" if IN_DOCKER else "DEBUG"
+# LOG_LEVEL = "INFO" if IN_DOCKER else "DEBUG"
 LOG_LEVEL = "DEBUG"
 
 LOGGING_CONFIG = {
@@ -54,13 +54,11 @@ LOGGING_CONFIG = {
     },
 }
 
+
 def setup_logging():
     """Ініціалізація конфігурації логування для Docker/Render."""
     logging.config.dictConfig(LOGGING_CONFIG)
 
-
-
-import secrets
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 BASE_WEBHOOK_URL = ""

@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
+
 @router.callback_query(F.data == "vacancy")
-async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data:dict):
+async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data: dict):
     """Fetch and display all vacancies bookmarked by the user.
 
     Aggregates job URLs and sends them back to the user, splitting the payload
@@ -33,10 +34,10 @@ async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data:dict):
         if not vacancies:
             await callback.message.answer(
                 text="📋 **У вас поки немає збережених вакансій.**\n\n"
-                     "💡 **Як це працює:** Бот збирає нові вакансії та аналізує їх під ваші фільтри **один раз на добу**.\n\n"
-                     "⏳ Якщо ви щойно налаштували пошук, будь ласка, зачекайте — перша підбірка з'явиться протягом 24 годин.",
+                "💡 **Як це працює:** Бот збирає нові вакансії та аналізує їх під ваші фільтри **один раз на добу**.\n\n"
+                "⏳ Якщо ви щойно налаштували пошук, будь ласка, зачекайте — перша підбірка з'явиться протягом 24 годин.",
                 reply_markup=registered_kb,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             await callback.answer()
             return
@@ -49,7 +50,7 @@ async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data:dict):
         for vac in vacancies:
             vac_text = f"{vac['title']}\n{vac['url']}"
             vac_length = len(vac_text)
-            if current_length + vac_length  > 4090:
+            if current_length + vac_length > 4090:
                 chunks.append("\n\n".join(current_chunk))
                 current_chunk = [vac_text]
                 current_length = 1
@@ -62,14 +63,17 @@ async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data:dict):
 
         # останній посилаємо з клавіатурою
         await callback.message.answer(
-            text="\n\n".join(current_chunk),
-            reply_markup=registered_kb
+            text="\n\n".join(current_chunk), reply_markup=registered_kb
         )
 
     except Exception as e:
         logger.error(
             "Помилка бази даних при отриманні вакансій для користувача %s: %s",
-            user_data.get("id"), e, exc_info=True
+            user_data.get("id"),
+            e,
+            exc_info=True,
         )
-        await callback.message.answer("Упс, сталася помилка при отриманні вакансій з бази даних.")
+        await callback.message.answer(
+            "Упс, сталася помилка при отриманні вакансій з бази даних."
+        )
         await callback.answer()

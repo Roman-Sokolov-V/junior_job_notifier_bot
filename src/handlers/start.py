@@ -3,6 +3,7 @@
 This module processes high-level user commands such as /start,
 routing users based on their registration status provided by the cache middleware.
 """
+
 import logging
 
 from aiogram import Router
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-@router.message(Command('start'))
+@router.message(Command("start"))
 async def start(message: Message, user_data: UserCacheItem | None):
     """Handle the /start command.
 
@@ -25,24 +26,22 @@ async def start(message: Message, user_data: UserCacheItem | None):
     otherwise prompt them to start the onboarding/registration process.
     """
     if not user_data:
-        logger.debug(f"Незареєстрований користувач {message.from_user.id} викликав /start")
+        logger.debug(
+            f"Незареєстрований користувач {message.from_user.id} викликав /start"
+        )
         await message.reply(
             text="Ви не зареєстровані. Бажаєте зареєструватися?",
-            reply_markup=not_registered_kb
+            reply_markup=not_registered_kb,
         )
     else:
         logger.debug(f"Зареєстрований користувач {message.from_user.id} зайшов у бот")
         await message.reply(
-            text=f"Привіт {user_data['username']}",
-            reply_markup=registered_kb
+            text=f"Привіт {user_data['username']}", reply_markup=registered_kb
         )
 
 
 @router.message(Command("help"))
-async def help_handler(
-    message: Message,
-    user_data: UserCacheItem | None
-) -> None:
+async def help_handler(message: Message, user_data: UserCacheItem | None) -> None:
     """Handle the /help command.
 
     Provide instructions on how to use the bot, dynamic tips based on
@@ -68,7 +67,9 @@ async def help_handler(
             "📌 <b>Твій статус:</b> Не зареєстрований.\n"
             "Щоб почати, натисни кнопку нижче або відправ команду /start"
         )
-        await message.reply(text=help_text, reply_markup=not_registered_kb, parse_mode="HTML")
+        await message.reply(
+            text=help_text, reply_markup=not_registered_kb, parse_mode="HTML"
+        )
     else:
         help_text += (
             "📌 <b>Твій статус:</b> Авторизований користувач.\n\n"
@@ -79,4 +80,6 @@ async def help_handler(
             "• <code>❌ Видалити підписку</code> — якщо ти вже знайшов роботу (вітаємо! 🎉) або сервіс тобі більше не потрібен з інших причин. Це повністю видалить твій акаунт та всі налаштування з бази даних.\n\n"
             "⏳ <i>Нагадування: якщо ти щойно змінив профіль або додав пошуковий профіль, зачекай наступного скрапінгу (до 24 годин) для оновлення результатів.</i>"
         )
-        await message.reply(text=help_text, reply_markup=registered_kb, parse_mode="HTML")
+        await message.reply(
+            text=help_text, reply_markup=registered_kb, parse_mode="HTML"
+        )

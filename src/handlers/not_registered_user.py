@@ -22,10 +22,8 @@ router = Router()
 
 @router.callback_query(F.data == "register_user")
 async def register_user(
-        callback: CallbackQuery,
-        db: AsyncClient,
-        users_cache: TTLCache[int, Any]
-)-> None:
+    callback: CallbackQuery, db: AsyncClient, users_cache: TTLCache[int, Any]
+) -> None:
     """Handle the user registration callback process.
 
     Registers a new user in the Supabase database using their Telegram credentials,
@@ -36,17 +34,17 @@ async def register_user(
 
     try:
         # 1. Намагаємося записати нового користувача в базу даних
-        user_data = await register_user_db(user_id=tg_user_id, username=tg_username, db=db)
+        user_data = await register_user_db(
+            user_id=tg_user_id, username=tg_username, db=db
+        )
         # 2. Оновлюємо кеш: затираємо старий None актуальними даними з БД
         users_cache[tg_user_id] = user_data
     except Exception as e:
         logger.error(f"Помилка бази даних при реєстрації: {e}", exc_info=True)
         await callback.answer(
-            "Упс, сталася помилка при реєстрації користувача в дб.",
-            show_alert=True
+            "Упс, сталася помилка при реєстрації користувача в дб.", show_alert=True
         )
         return
     await callback.message.edit_text(
-        "Успішно зареєстровано",
-        reply_markup=create_profile_kb
+        "Успішно зареєстровано", reply_markup=create_profile_kb
     )

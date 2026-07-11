@@ -1,12 +1,14 @@
-""""Middleware for integration with external services.
+""" "Middleware for integration with external services.
 
 This module contains middleware for aiogram,
 which provides access to the Supabase database client inside handlers.
 """
+
 from typing import Any, Awaitable, Callable, Dict
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 from supabase import AsyncClient
+
 
 class SupabaseMiddleware(BaseMiddleware):
     """Middleware to wake up an asynchronous Supabase client into the context of a request.
@@ -14,6 +16,7 @@ class SupabaseMiddleware(BaseMiddleware):
     Adds the initialized AsyncClient object to the 'data' dictionary under the 'db' key,
     which makes it available in all subsequent middleware and handlers.
     """
+
     def __init__(self, supabase_client: AsyncClient):
         """Initializes the middleware with the Supabase client ready-made.
 
@@ -28,7 +31,7 @@ class SupabaseMiddleware(BaseMiddleware):
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
         event: TelegramObject,
-        data: Dict[str, Any]
+        data: Dict[str, Any],
     ) -> Any:
         """Обробка вхідного оновлення.
 

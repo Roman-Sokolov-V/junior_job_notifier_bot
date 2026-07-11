@@ -4,7 +4,14 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from supabase import AsyncClient, create_async_client
 
-from settings import SUPABASE_KEY, SUPABASE_URL, TELEGRAM_BOT_TOKEN, setup_logging, WEBHOOK_SECRET, WEBHOOK_URL
+from settings import (
+    SUPABASE_KEY,
+    SUPABASE_URL,
+    TELEGRAM_BOT_TOKEN,
+    setup_logging,
+    WEBHOOK_SECRET,
+    WEBHOOK_URL,
+)
 from src.handlers import router
 from src.middlewares.supabase import SupabaseMiddleware
 from src.middlewares.user import UserInjectedMiddleware
@@ -14,16 +21,18 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-
 supabase_client: AsyncClient | None = None
+
 
 def create_bot() -> Bot:
     return Bot(token=TELEGRAM_BOT_TOKEN)
+
 
 def create_dispatcher() -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_routers(router)
     return dp
+
 
 #
 # async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
@@ -56,6 +65,7 @@ def create_dispatcher() -> Dispatcher:
 #
 #     await bot.session.close()
 #     logger.info("Сесію бота успішно закрито.")
+
 
 async def init_resources(dispatcher: Dispatcher) -> AsyncClient:
     """Initializes shared resources: Supabase client and middlewares.
