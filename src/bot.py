@@ -48,7 +48,7 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
 
 async def on_shutdown(bot: Bot) -> None:
     logger.info("Зупинка бота. Очищення ресурсів...")
-    #await bot.delete_webhook()
+    await bot.delete_webhook()
 
     if supabase_client and hasattr(supabase_client, "http_client"):
         await supabase_client.http_client.aclose()
