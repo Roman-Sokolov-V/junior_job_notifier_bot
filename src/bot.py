@@ -25,18 +25,56 @@ def create_dispatcher() -> Dispatcher:
     dp.include_routers(router)
     return dp
 
+#
+# async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
+#     """"Called once when the aiohttp server starts."""
+#     global supabase_client
+#
+#     logger.info("Запуск бота та ініціалізація ресурсів...")
+#
+#     if supabase_client is None:
+#         supabase_client = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
+#         dispatcher["supabase_client"] = supabase_client
+#         dispatcher.update.middleware(SupabaseMiddleware(supabase_client))
+#         dispatcher.update.middleware(UserInjectedMiddleware(supabase_client))
+#
+#     await bot.set_webhook(
+#         WEBHOOK_URL,
+#         secret_token=WEBHOOK_SECRET,
+#         allowed_updates=dispatcher.resolve_used_update_types(),
+#     )
+#     logger.info(f"Webhook встановлено: {WEBHOOK_URL}")
+#
+#
+# async def on_shutdown(bot: Bot) -> None:
+#     logger.info("Зупинка бота. Очищення ресурсів...")
+#     #await bot.delete_webhook()
+#
+#     if supabase_client and hasattr(supabase_client, "http_client"):
+#         await supabase_client.http_client.aclose()
+#         logger.info("Сесію Supabase клієнта успішно закрито.")
+#
+#     await bot.session.close()
+#     logger.info("Сесію бота успішно закрито.")
 
-async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
-    """"Called once when the aiohttp server starts."""
+async def init_resources(dispatcher: Dispatcher) -> AsyncClient:
+    """Initializes shared resources: Supabase client and middlewares.
+
+    Used by both the webhook (main.py) and polling (main_polling.py) entry points.
+    """
     global supabase_client
-
-    logger.info("Запуск бота та ініціалізація ресурсів...")
-
     if supabase_client is None:
         supabase_client = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
         dispatcher["supabase_client"] = supabase_client
         dispatcher.update.middleware(SupabaseMiddleware(supabase_client))
         dispatcher.update.middleware(UserInjectedMiddleware(supabase_client))
+    return supabase_client
+
+
+async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
+    """Called once when the aiohttp server starts (webhook mode)."""
+    logger.info("Запуск бота та ініціалізація ресурсів...")
+    await init_resources(dispatcher)
 
     await bot.set_webhook(
         WEBHOOK_URL,
@@ -47,8 +85,8 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot) -> None:
 
 
 async def on_shutdown(bot: Bot) -> None:
+    """Called when the server is stopped (webhook mode)."""
     logger.info("Зупинка бота. Очищення ресурсів...")
-    #await bot.delete_webhook()
 
     if supabase_client and hasattr(supabase_client, "http_client"):
         await supabase_client.http_client.aclose()
