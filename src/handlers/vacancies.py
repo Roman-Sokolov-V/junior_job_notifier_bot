@@ -47,7 +47,7 @@ async def my_vac(callback: CallbackQuery, db: AsyncClient, user_data:dict):
         current_chunk: list[str] = []
         current_length = 0
         for vac in vacancies:
-            vac_text = f"{vac['title']}/n{vac['title']}"
+            vac_text = f"{vac['title']}/n{vac['url']}"
             vac_length = len(vac_text)
             if current_length + vac_length  > 4090:
                 chunks.append("\n\n".join(current_chunk))
