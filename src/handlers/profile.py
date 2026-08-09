@@ -9,6 +9,7 @@ import html
 import logging
 from typing import Any
 
+import mimetypes
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -49,6 +50,8 @@ class Profile(StatesGroup):
     exclude_keywords: list = State()
     include_keywords: list = State()
     query_text: str = State()
+    file: str = State()
+
 
 
 @router.callback_query(F.data == "create_profile")
@@ -58,7 +61,7 @@ async def create_profile(callback: CallbackQuery, state: FSMContext) -> None:
     logger.debug("Користувач %s розпочав створення профілю", callback.from_user.id)
 
     await state.set_state(Profile.name)
-    await callback.message.answer(
+    await callback.message.edit_text(
         "📝 **Введіть ім'я для нового профілю пошуку**\n\n"
         "💡 Ви можете створити кілька різних профілів (наприклад: *Python Junior*, *Data Analyst*).\n\n"
         "⚠️ **Важливо:** якщо ввести назву профілю, який уже існує, новий профіль перезапише старий!"
@@ -107,41 +110,156 @@ async def add_include_ask_for_exclude_filters(
 async def add_exclude_ask_for_prompt(message: Message, state: FSMContext) -> None:
     """Save exclusion keywords and request AI filter prompt."""
     logger.debug("FSM: Збереження exclude_keywords для %s", message.from_user.id)
-    text = message.text or "pass"
-    key_words = text.lower().strip().split()
+    text = (message.text or "pass").strip()
+    key_words = text.lower().split()
     await state.update_data(exclude_keywords=[] if key_words == ["pass"] else key_words)
     await state.set_state(Profile.query_text)
 
     await message.answer(
         "🤖 **Налаштування AI-фільтра (аналіз вакансії за допомогою ШІ)**\n\n"
-        "Опишіть своїми словами, що саме нейромережа має шукати або перевіряти в повному описі вакансії.\n"
-        "_(Наприклад: «Відсіюй вакансії, де вимагають знання англійської вище B1» або «Шукай тільки позиції з можливістю повного ремонтауту»)_\n\n"
-        "⏩ Якщо цей фільтр не потрібен, просто введіть **pass**",
+        "Опишіть своїми словами, що саме нейромережа має перевіряти в описі вакансії.\n"
+        "_(Наприклад: «Відсіюй вакансії, де вимагають знання англійської вище B1»)_\n\n"
+        "💡 **Зверніть увагу:** завантаження резюме (CV) буде доступне **тільки за наявності AI-промпту**, "
+        "оскільки ШІ аналізує документ саме на основі ваших вказівок.\n\n"
+        "⏩ Якщо AI-аналіз та резюме не потрібні, просто введіть **pass**",
+        parse_mode="Markdown",
+    )
+
+MAX_FILE_SIZE_MB = 2
+MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
+
+@router.message(Profile.query_text)
+async def add_prompt_ask_for_cv(
+    message: Message, state: FSMContext, user_data: dict
+) -> None:
+    """Save AI prompt and conditionally ask for CV document or skip to preview."""
+    logger.debug("FSM: Збереження query_text для %s", message.from_user.id)
+    text = (message.text or "").strip()
+    is_pass = text.lower() == "pass"
+
+    query_text = "" if is_pass else text
+    await state.update_data(query_text=query_text)
+
+    # 🛑 ЛОГІКА ОПТИМІЗАЦІЇ: Якщо AI-промпт відсутній — CV використовувати неможливо
+    if not query_text:
+        # Гарантовано скидаємо дані CV в None
+        await state.update_data(cv_bytes=None, cv_filename=None, cv_mime=None)
+
+        await message.answer(
+            "ℹ️ **Завантаження CV пропущено**\n\n"
+            "Оскільки AI-фільтр не налаштовано (ви вказали `pass`), завантаження резюме недоступне, "
+            "адже аналіз CV працює виключно в зв'язці з AI-запитом.\n"
+            "Формуємо попередній перегляд...",
+            parse_mode="Markdown",
+        )
+        # Одразу переходимо до перегляду профілю
+        await _render_and_send_preview(message, state, user_data)
+        return
+
+    # Якщо промпт є — пропонуємо завантажити CV
+    await state.set_state(Profile.file)
+
+    await message.answer(
+        f"📄 **Завантаження вашого CV (резюме не більше {MAX_FILE_SIZE_MB} мб)**\n\n"
+        f"Надішліть файл вашого резюме (підтримуються **PDF** або **TXT**).\n"
+        f"ШІ порівнюватиме ваші навички з вимогами вакансії на основі вашого AI-запиту і CV.\n\n"
+        f"⏩ Якщо ви не хочете додавати резюме, просто введіть **pass**",
         parse_mode="Markdown",
     )
 
 
-@router.message(Profile.query_text)
-async def add_prompt_create_profile_in_db(
-    message: Message, state: FSMContext, user_data: dict
+
+@router.message(Profile.file)
+async def process_cv_and_show_preview(
+    message: Message, state: FSMContext, user_data: dict, bot
 ) -> None:
-    """Process AI prompt, validate input data, and render configuration preview."""
-    logger.debug("FSM: Фіналізація профілю для %s", message.from_user.id)
-    text = message.text.strip()
-    await state.update_data(query_text="" if text.lower() == "pass" else text)
+    """Process CV file input with size and format validation, then render preview."""
+    logger.debug("FSM: Перевірка CV та збір прев'ю для %s", message.from_user.id)
 
     raw_data = await state.get_data()
 
+    # Запобіжник: якщо з якоїсь причини немає query_text, файл не приймаємо
+    if not raw_data.get("query_text"):
+        await state.update_data(cv_bytes=None, cv_filename=None, cv_mime=None)
+        await _render_and_send_preview(message, state, user_data)
+        return
+
+    # 1. Обробка файлу (якщо надіслано документ)
+    if message.document:
+        doc = message.document
+
+        # 🛑 ПЕРЕВІРКА 1: Розмір файлу з метаданих Telegram
+        if doc.file_size and doc.file_size > MAX_FILE_SIZE:
+            file_size_mb = round(doc.file_size / (1024 * 1024), 2)
+            await message.answer(
+                f"❌ **Файл занадто великий!**\n\n"
+                f"Розмір вашого файлу: **{file_size_mb} МБ**.\n"
+                f"Максимально дозволений розмір: **{MAX_FILE_SIZE_MB} МБ**.\n\n"
+                f"Будь ласка, стисніть файл або надішліть інший (або введіть **pass**)."
+            )
+            return
+
+        # 🛑 ПЕРЕВІРКА 2: Формат/MIME-тип файлу
+        mime_type = doc.mime_type or (mimetypes.guess_type(doc.file_name or "")[0])
+        allowed_mimes = ["application/pdf", "text/plain"]
+
+        if mime_type not in allowed_mimes:
+            await message.answer(
+                "❌ **Непідтримуваний формат файлу!**\n\n"
+                "Будь ласка, надішліть резюме у форматі **PDF** або **TXT** (або введіть **pass** для пропуску)."
+            )
+            return
+
+        # Завантажуємо байти файлу з Telegram в оперативну пам'ять
+        telegram_file = await bot.get_file(doc.file_id)
+        file_buffer = await bot.download_file(telegram_file.file_path)
+        file_bytes = file_buffer.read()
+
+        # 🛑 ПЕРЕВІРКА 3: Фактичний розмір у пам'яті
+        if len(file_bytes) > MAX_FILE_SIZE:
+            await message.answer(
+                f"❌ **Файл перевищує ліміт у {MAX_FILE_SIZE_MB} МБ!** Будь ласка, завантажте менший файл."
+            )
+            return
+
+        # Зберігаємо байти та метадані в FSM
+        await state.update_data(
+            cv_bytes=file_bytes,
+            cv_filename=doc.file_name or "cv.pdf",
+            cv_mime=mime_type,
+        )
+
+    elif message.text and message.text.lower().strip() == "pass":
+        # Скидаємо дані про файл в FSM
+        await state.update_data(cv_bytes=None, cv_filename=None, cv_mime=None)
+    else:
+        await message.answer(
+            "⚠️ Будь ласка, надішліть **документ** (PDF/TXT до 2 МБ) або введіть **pass**."
+        )
+        return
+
+    # 2. Формуємо та відправляємо прев'ю
+    await _render_and_send_preview(message, state, user_data)
+
+
+
+
+async def _render_and_send_preview(
+        message: Message, state: FSMContext, user_data: dict
+) -> None:
+    """Допоміжна функція для перевірки наявності фільтрів та відправки прев'ю."""
+    raw_data = await state.get_data()
+
+    # Перевірка на наявність хоча б одного фільтра
     has_filters = (
-        bool(raw_data.get("include_keywords"))
-        or bool(raw_data.get("exclude_keywords"))
-        or bool(raw_data.get("query_text"))
+            bool(raw_data.get("include_keywords"))
+            or bool(raw_data.get("exclude_keywords"))
+            or bool(raw_data.get("query_text"))
     )
 
     if not has_filters:
         username = user_data.get("username") or message.from_user.first_name
 
-        # 1. Повідомляємо про помилку
         await message.answer(
             "⚠️ **Помилка створення профілю**\n\n"
             "Ви не ввели жодного фільтра пошуку (скрізь вказали `pass`).\n\n"
@@ -150,13 +268,9 @@ async def add_prompt_create_profile_in_db(
             parse_mode="Markdown",
         )
 
-        # 2. Очищаємо дані в state, але зберігаємо структуру FSM
         await state.set_data({})
-
-        # 3. Переводимо на початковий крок
         await state.set_state(Profile.name)
 
-        # 4. Повторюємо перше запитання з create_profile
         await message.answer(
             "📝 **Введіть ім'я для нового профілю пошуку**\n\n"
             "💡 Ви можете створити кілька різних профілів (наприклад: *Python Junior*, *Data Analyst*).\n\n"
@@ -164,20 +278,32 @@ async def add_prompt_create_profile_in_db(
         )
         return
 
+    # Формуємо прев'ю профілю
     inc_words = ", ".join(raw_data.get("include_keywords", [])) or "не вказано"
     exc_words = ", ".join(raw_data.get("exclude_keywords", [])) or "не вказано"
     ai_prompt = raw_data.get("query_text") or "не вказано"
 
+    cv_filename = raw_data.get("cv_filename")
+    cv_status = (
+        f"📄 <code>{html.escape(cv_filename)}</code>"
+        if raw_data.get("cv_bytes") and cv_filename
+        else "не додано ❌"
+    )
+
     preview_text = (
         f"📊 <b>Попередній перегляд профілю:</b>\n\n"
-        f"🔹 <b>Ім'я профілю:</b> {html.escape(raw_data['name'])}\n"
+        f"🔹 <b>Ім'я профілю:</b> {html.escape(raw_data.get('name', ''))}\n"
         f"➕ Шукати слова: <code>{html.escape(inc_words)}</code>\n"
         f"➖ Ігнорувати слова: <code>{html.escape(exc_words)}</code>\n"
-        f"🤖 AI-промпт: <i>{html.escape(ai_prompt)}</i>"
+        f"🤖 AI-промпт: <i>{html.escape(ai_prompt)}</i>\n"
+        f"📎 Резюме (CV): {cv_status}"
     )
+
     await message.reply(
         text=preview_text, reply_markup=save_or_remake_profile_kb, parse_mode="HTML"
     )
+
+
 
 
 @router.callback_query(F.data == "save_profile")
@@ -186,18 +312,29 @@ async def save_profile(
 ) -> None:
     """Save the constructed FSM profile into the Supabase database."""
     profile_data = await state.get_data()
-    await state.clear()
+
+    if not profile_data:
+        await callback.answer("Дані втрачено ❌", show_alert=True)
+        await callback.message.edit_text(
+            "⚠️ Дані профілю не заповнені або втрачені через неактивність.\n"
+            "Будь ласка, почніть заповнення анкети спочатку."
+        )
+        return
     profile_data["user_id"] = user_data.get("id")
 
     try:
         await create_or_update_profile_db(profile_data=profile_data, db=db)
-        await callback.message.answer("Профіль фільтрації збережено")
-        await callback.message.answer(text="Головне меню", reply_markup=registered_kb)
+        await state.clear()
+        await callback.message.edit_text(
+            text="Профіль фільтрації збережено ✅\n\nГоловне меню",
+            reply_markup=registered_kb
+        )
     except Exception as e:
         logger.error("Помилка збереження профілю в БД: %s", e, exc_info=True)
         await callback.message.answer(
             "Сталася помилка бази даних при збереженні профілю."
         )
+
     await callback.answer()
 
 
@@ -210,7 +347,7 @@ async def show_profiles(
         profiles_list: list[dict[str, Any]] = await get_user_profiles_from_db(
             user_db_id=user_data.get("id"), db=db
         )
-
+        await callback.message.delete()
         for index, profile in enumerate(profiles_list):
             buttons = [
                 [
@@ -227,18 +364,19 @@ async def show_profiles(
 
             delete_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
-            await callback.message.answer(
+            await callback.message.edit_text(
                 text=f"📋 **Ім'я профілю:** {profile['name']}\n"
                 f"➕ Включити слова: {', '.join(profile['include_keywords']) if profile['include_keywords'] else 'немає'}\n"
                 f"➖ Виключити слова: {', '.join(profile['exclude_keywords']) if profile['exclude_keywords'] else 'немає'}\n"
-                f"🤖 Промпт: {profile['query_text'] or 'немає'}",
+                f"🤖 Промпт: {profile['query_text'] or 'немає'}\n"
+                f" CV файл: {profile['cv_file'].split("/")[-1] if profile['cv_file'] else 'не надано'}",
                 reply_markup=delete_kb,
                 parse_mode="Markdown",
             )
         await callback.answer()
 
     except EmptyResponse:
-        await callback.message.answer(
+        await callback.message.edit_text(
             text="У вас поки нема жодного профілю", reply_markup=create_profile_kb
         )
         await callback.answer()
@@ -314,3 +452,4 @@ async def delete_subscription(
         )
         await callback.message.edit_text("Сталася помилка при видаленні з бази даних.")
     await callback.answer()
+

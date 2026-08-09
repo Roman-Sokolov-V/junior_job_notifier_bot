@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 # Запуск бота
-CMD ["python", "polling_main.py"]
+CMD ["python", "main_polling.py"]
 
 
 

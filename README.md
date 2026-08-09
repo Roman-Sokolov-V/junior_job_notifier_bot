@@ -45,8 +45,18 @@ Users can create an **unlimited number of profiles**. Each profile can combine t
 | **Include keywords** | Rejects vacancies whose title contains *none* of the listed keywords. |
 | **Exclude keywords** | Rejects vacancies whose title contains *at least one* of the listed keywords. |
 | **AI prompt (semantic matching)** | Vacancies surviving the keyword filters are passed through a neural network for semantic matching against a free-text prompt describing what the user is looking for. |
+| **LLM filter (prompt + CV)** | Vacancies surviving semantic matching (in the [main project](https://github.com/Roman-Sokolov-V/junior_job_notifier)) are passed through an LLM filter that evaluates them against the same AI prompt, optionally combined with the user's uploaded CV for a more personalized match. |
 
-This layered approach lets users combine cheap, fast keyword filtering with more expensive semantic matching only on the reduced candidate set.
+This layered approach lets users combine cheap, fast keyword filtering with progressively more expensive filtering — semantic matching, then LLM-based filtering — only on the reduced candidate set.
+
+#### CV Upload
+
+If a profile has an AI prompt configured, the user can optionally attach a CV during profile creation/editing:
+
+- **Supported formats:** PDF, TXT, Markdown (`application/pdf`, `text/plain`, `text/markdown`)
+- **Max file size:** 2 MB
+- CV upload is only offered when an AI prompt is set, since the LLM filter uses the CV together with the prompt — without a prompt there's nothing for it to match the CV against.
+- Uploaded CVs are stored in Supabase Storage (via `get_or_create_bucket` / `upload_file` in `src/db/storage.py`), and a reference to the file is saved on the profile record in the database (`create_or_update_profile_db` in `src/db/crud.py`). The actual LLM comparison against the CV happens in the main scraping/matching project, not in this bot — the bot's role is limited to collecting, validating, and storing the CV.
 
 ## Tech Stack
 
@@ -63,27 +73,34 @@ This layered approach lets users combine cheap, fast keyword filtering with more
 junior_job_notifier_bot/
 ├── src/
 │   ├── db/
-│   │   └── crud.py              # Supabase CRUD operations
+│   │   ├── __init__.py
+│   │   ├── crud.py              # Supabase CRUD operations
+│   │   └── storage.py           # Supabase Storage helpers (CV upload/bucket management)
 │   ├── handlers/
-│   │   ├── start.py             # /start, registration entry point
-│   │   ├── not_registered_user.py
-│   │   ├── profile.py           # profile creation/editing FSM, deletion
+│   │   ├── __init__.py
 │   │   ├── me.py                # "About telegram user" view
+│   │   ├── not_registered_user.py
+│   │   ├── profile.py           # profile creation/editing FSM, CV upload, deletion
+│   │   ├── start.py             # /start, registration entry point
 │   │   └── vacancies.py         # browsing matched vacancies
 │   ├── keyboards/
+│   │   ├── __init__.py
 │   │   └── keyboards.py         # reply & inline keyboards
 │   ├── middlewares/
+│   │   ├── __init__.py
 │   │   ├── supabase.py          # injects the Supabase client into handlers
 │   │   └── user.py              # injects user data, registration status
+│   ├── __init__.py
 │   ├── bot.py                   # Bot/Dispatcher factory, startup/shutdown hooks
 │   └── exceptions.py
-├── main.py                      # aiohttp webhook server entry point (production)
-├── main_polling.py              # aiohttp polling server entry point
-├── polling_main.py              # long polling entry point (local development only)
-├── settings.py                  # environment configuration, logging setup
 ├── Dockerfile
+├── README.md
+├── example.env
+├── main.py                      # aiohttp webhook server entry point (production)
+├── main_polling.py              # long polling entry point (local development only)
 ├── polling.Dockerfile
 ├── pyproject.toml
+├── settings.py                  # environment configuration, logging setup
 └── uv.lock
 ```
 
@@ -152,11 +169,11 @@ For contributors with their own Supabase setup:
 
 ```bash
 uv sync
-cp .env.example .env  # fill in your own Supabase project + bot token
-uv run polling_main.py
+cp example.env .env  # fill in your own Supabase project + bot token
+uv run main_polling.py
 ```
 
-`polling_main.py` runs the bot in long polling mode, avoiding the tunneling setup that webhook mode would otherwise require locally. See [Docker](#docker) for containerized alternatives.
+`main_polling.py` runs the bot in long polling mode, avoiding the tunneling setup that webhook mode would otherwise require locally. See [Docker](#docker) for containerized alternatives.
 
 ## Related Projects
 

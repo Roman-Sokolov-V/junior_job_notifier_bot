@@ -2,6 +2,7 @@ import logging
 
 from supabase import AsyncClient
 
+from src.db.storage import upload_file
 from src.exceptions import EmptyResponse
 
 logger = logging.getLogger(__name__)
@@ -54,15 +55,53 @@ async def delete_user_from_db(user_id: int, db: AsyncClient) -> None:
 
 
 async def create_or_update_profile_db(profile_data: dict, db: AsyncClient) -> dict:
+    # Витягуємо дані CV
+    cv_bytes = profile_data.pop("cv_bytes", None)
+    cv_filename = profile_data.pop("cv_filename", None)
+    cv_mime = profile_data.pop("cv_mime", None)
+    # Спочатку створюємо/оновлюємо профіль у БД
     response = await (
         db.table("user_profiles")
         .upsert(
             profile_data,
-            on_conflict="user_id,name",  # <--- Ключовий момент!
+            on_conflict="user_id,name",
         )
         .execute()
     )
-    return response.data[0]
+
+    if not response.data:
+        raise Exception("Не вдалося створити профіль у БД.")
+
+    created_profile = response.data[0]
+    profile_id = created_profile["id"]
+
+    # Якщо є файл CV — завантажуємо його у Storage
+    if cv_bytes and cv_filename:
+        storage_path = f"{profile_id}/{cv_filename}"
+        storage_response = await upload_file(
+            db=db,
+            file_bytes=cv_bytes,
+            destination_path=storage_path
+        )
+
+        # Якщо завантаження пройшло успішно — оновлюємо поля в БД
+        if storage_response:
+            logger.info(storage_response)
+
+            storage_full_path = storage_response.full_path
+            logger.info(storage_full_path)
+            update_response = await (
+                db.table("user_profiles")
+                .update({
+                    "cv_file": storage_full_path,
+                    "mime_type": cv_mime
+                })
+                .eq("id", profile_id)
+                .execute()
+            )
+            return update_response.data[0]
+
+    return created_profile
 
 
 async def get_user_vacancies_from_db(user_db_id: int, db: AsyncClient) -> list[dict]:

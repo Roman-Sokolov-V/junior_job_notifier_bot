@@ -67,3 +67,5 @@ WEBHOOK_PATH = "/webhook"
 # у змінну оточення RENDER_EXTERNAL_URL, наприклад:
 # https://junior-job-notifier-bot.onrender.com
 WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL", "") + WEBHOOK_PATH
+
+ALLOWED_MIME_TYPES = ["application/pdf", "text/plain", "text/markdown"]
