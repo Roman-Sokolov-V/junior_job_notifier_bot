@@ -34,6 +34,32 @@ async def get_user_profiles_from_db(user_db_id: int, db: AsyncClient) -> list[di
 
 
 async def delete_profile_from_db(profile_id: int, db: AsyncClient) -> None:
+    """deletes the profile from the database and the cv file from the storage"""
+    # 1. Отримуємо дані про профіль, щоб дізнатися шлях до файлу
+    response = await (
+        db.table("user_profiles")
+        .select("cv_file")
+        .eq("id", profile_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not response.data:
+        raise EmptyResponse("Профіль не знайдено.")
+
+    cv_file_path = response.data.get("cv_file")
+
+    # 2. Якщо файл є в Storage — видаляємо його
+    if cv_file_path:
+        try:
+            bucket_name, storage_path = cv_file_path.split("/", maxsplit=1)
+
+            await db.storage.from_(bucket_name).remove([storage_path])
+            logger.info("Файл %s успішно видалено зі Storage", cv_file_path)
+        except Exception as e:
+            logger.error("Помилка видалення файлу зі Storage: %s", e, exc_info=True)
+
+    # 3. Видаляємо сам запис профілю з таблиці БД
     await db.table("user_profiles").delete().eq("id", profile_id).execute()
 
 
