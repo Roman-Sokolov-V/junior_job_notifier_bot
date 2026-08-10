@@ -1,9 +1,12 @@
+import logging
+
 from storage3.exceptions import StorageApiError
 from storage3.types import UploadResponse
 from supabase import AsyncClient
 
 from settings import ALLOWED_MIME_TYPES
 
+logger = logging.getLogger(__name__)
 
 async def get_or_create_bucket(
     db: AsyncClient,
@@ -51,3 +54,12 @@ async def upload_file(
         }
     )
     return response
+
+async def remove_file(db: AsyncClient, full_path: str) -> None:
+    """Deletes a single file from Supabase Storage by full path."""
+    try:
+        bucket_name, storage_path = full_path.split("/", maxsplit=1)
+        await db.storage.from_(bucket_name).remove([storage_path])
+        logger.info("Файл %s успішно видалено зі Storage", full_path)
+    except Exception as e:
+        logger.error("Помилка видалення файлу %s зі Storage: %s", full_path, e, exc_info=True)

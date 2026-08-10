@@ -2,7 +2,7 @@ import logging
 
 from supabase import AsyncClient
 
-from src.db.storage import upload_file
+from src.db.storage import upload_file, remove_file
 from src.exceptions import EmptyResponse
 
 logger = logging.getLogger(__name__)
@@ -52,9 +52,7 @@ async def delete_profile_from_db(profile_id: int, db: AsyncClient) -> None:
     # 2. Якщо файл є в Storage — видаляємо його
     if cv_file_path:
         try:
-            bucket_name, storage_path = cv_file_path.split("/", maxsplit=1)
-
-            await db.storage.from_(bucket_name).remove([storage_path])
+            await remove_file(full_path=cv_file_path)
             logger.info("Файл %s успішно видалено зі Storage", cv_file_path)
         except Exception as e:
             logger.error("Помилка видалення файлу зі Storage: %s", e, exc_info=True)
@@ -76,7 +74,29 @@ async def register_user_db(user_id: int, username: str, db: AsyncClient) -> dict
     return user_data
 
 
+async def get_user_cv_files_paths(user_db_id: int, db: AsyncClient) -> list[str]:
+    """Returns a list of valid paths to the user's CV files."""
+    response = await (
+        db.table("user_profiles")
+        .select("cv_file")
+        .eq("user_id", user_db_id)
+        .execute()
+    )
+    return [
+        item["cv_file"]
+        for item in (response.data or [])
+        if item.get("cv_file")
+    ]
+
+
 async def delete_user_from_db(user_id: int, db: AsyncClient) -> None:
+    """Deletes all CV files of the user and the user himself from the database."""
+    cv_paths = await get_user_cv_files_paths(user_db_id=user_id, db=db)
+
+    for path in cv_paths:
+        await remove_file(db=db, full_path=path)
+
+    # Видалення користувача з таблиці users
     await db.table("users").delete().eq("id", user_id).execute()
 
 
